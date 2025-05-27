@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import octoprint.plugin
 from octoprint.util import RepeatedTimer
 from octoprint.server import user_permission
+from octoprint.access.permissions import Permissions
 
 import os.path
 from os import path
@@ -807,8 +808,13 @@ class TopTempPlugin(octoprint.plugin.StartupPlugin,
             template.update(self.defaultsCustom)
             return flask.jsonify(template)
 
-         # Get history data
+         # Test command
         if command == "testCmd":
+            # This command is only used in the plugin settings.
+            # Only users with the privilege to modify plugin settings should be allowed to use it.
+            if not Permissions.SETTINGS.can():
+                return flask.make_response("Insufficient rights", 403)
+            
             cmdInput = data["cmd"]
             cmdType = data["type"]
             if cmdType == "psutil":
