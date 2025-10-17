@@ -116,7 +116,7 @@ class TopTempPlugin(octoprint.plugin.StartupPlugin,
         }
 
         # type can be cmd, gcIn, gcOut, psutil
-        self.defaultsCustom = {'cmd':'','name':'','interval': 25, 'type':'cmd', 'isTemp' : True , 'waitForPrint' : False, 'hideIfNoPrinter': False, 'unit' : '', 'postCalc' : None}
+        self.defaultsCustom = {'cmd':'','name':'','interval': 25, 'type':'cmd', 'isTemp' : True , 'waitForPrint' : False, 'hideIfPrint' : False, 'hideIfNoPrinter': False, 'unit' : '', 'postCalc' : None}
 
     # ----------------------------------------------------------------------------------------------------------------
     # Lets get started
@@ -244,6 +244,7 @@ class TopTempPlugin(octoprint.plugin.StartupPlugin,
         newCust['cu1']['colorIcons'] = False
         newCust['cu1']['showUnit'] = False
         newCust['cu1']['waitForPrint'] = True
+        newCust['cu1']['hideIfPrint'] = True
         newCust['cu1']['postCalc'] = 'X/255*100'
         newCust['cu1']['unit'] = '%'
         self.debugOut(newCust)
