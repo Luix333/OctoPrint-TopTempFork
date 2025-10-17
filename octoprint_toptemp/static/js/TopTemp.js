@@ -67,6 +67,7 @@ $(function() {
                 || (data.target == 0 && iSettings.hideOnNoTarget())
                 || (!customType && self.settings.hideInactiveTemps() && self.tempModel.isOperational() !== true)
                 || ('waitForPrint' in iSettings && iSettings.waitForPrint() && !self.connection.isPrinting())
+                || ('hideIfPrint' in iSettings && iSettings.hideIfPrint() && self.connection.isPrinting())
                 ||  ('hideIfNoPrinter' in iSettings && iSettings.hideIfNoPrinter() && !self.tempModel.isOperational())
             ){
                 $('#navbar_plugin_toptemp_'+name).hide();
@@ -1523,6 +1524,12 @@ $(function() {
                 if (localSettings.waitForPrint()){
                     className += " TopTempWaitPrinter";
                     if (!self.connection.isPrinting()){
+                        preHide = true;
+                    }
+                }
+                if (localSettings.hideIfPrint()){
+                    className += " TopTempWaitPrinter";
+                    if (self.connection.isPrinting()){
                         preHide = true;
                     }
                 }
