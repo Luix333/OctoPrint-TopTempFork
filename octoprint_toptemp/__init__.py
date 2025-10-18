@@ -975,7 +975,7 @@ class TopTempPlugin(octoprint.plugin.StartupPlugin,
         return inputStr.replace('.','',1).isdigit()
 
 
-__plugin_name__ = "Top Temp"
+__plugin_name__ = "Top Temp Fork"
 __plugin_pythoncompat__ = ">=2.7,<4"
 
 def __plugin_load__():
