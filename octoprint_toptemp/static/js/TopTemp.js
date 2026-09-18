@@ -67,6 +67,7 @@ $(function() {
                 || (data.target == 0 && iSettings.hideOnNoTarget())
                 || (!customType && self.settings.hideInactiveTemps() && self.tempModel.isOperational() !== true)
                 || ('waitForPrint' in iSettings && iSettings.waitForPrint() && !self.connection.isPrinting())
+                || ('waitForIdle' in iSettings && iSettings.waitForIdle() && self.connection.isPrinting())
                 ||  ('hideIfNoPrinter' in iSettings && iSettings.hideIfNoPrinter() && !self.tempModel.isOperational())
             ){
                 $('#navbar_plugin_toptemp_'+name).hide();
@@ -551,6 +552,22 @@ $(function() {
                         });
                     }
                 })
+
+                // "Only while printing" and "only while idle" cancel each other out,
+                // so ticking one clears the other instead of hiding the item for good
+                $.each({'waitForPrint':'waitForIdle','waitForIdle':'waitForPrint'},function(thisOne,otherOne){
+                    var $this = $('#'+newId).find(':input[data-settings="'+thisOne+'"]');
+                    var $other = $('#'+newId).find(':input[data-settings="'+otherOne+'"]');
+                    if (!$this.length || !$other.length || !(otherOne in self.settings.customMon[idx])){
+                        return true;
+                    }
+                    $this.off('change.toptempexcl').on('change.toptempexcl',function(){
+                        if ($(this).prop('checked')){
+                            self.settings.customMon[idx][otherOne](false);
+                            $other.prop('checked',false);
+                        }
+                    });
+                });
 
                 // Observe custom mon fields
                 $('#'+newId).find(':input[data-custommon]').each(function(){
@@ -1066,13 +1083,7 @@ $(function() {
 
             // Wait for print states to switch
             self.connection.isPrinting.subscribe(function(state){
-                if (state){
-                    $('#navbar_plugin_toptemp div.TopTempWaitPrinter').show();
-                    $('#navbar_plugin_toptemp div.TopTempWaitPrinter + span.divider-vertical').show();
-                }else{
-                    $('#navbar_plugin_toptemp div.TopTempWaitPrinter').hide();
-                    $('#navbar_plugin_toptemp div.TopTempWaitPrinter + span.divider-vertical').hide();
-                }
+                self.updatePrintStateVis();
             });
 
 
@@ -1097,6 +1108,29 @@ $(function() {
                     self.popoverOpen = false;
                     $('#navbar_plugin_toptemp >div').popover('hide');
                 }
+            });
+        }
+
+        // Show/hide the items that only appear while printing or while idle.
+        // Kept in one place so both options agree, and so neither one reveals an
+        // item that is hidden for another reason (disabled, or printer disconnected).
+        self.updatePrintStateVis = function(){
+            var printing = self.connection.isPrinting();
+            $('#navbar_plugin_toptemp div.TopTempWaitPrinter, #navbar_plugin_toptemp div.TopTempWaitIdle').each(function(){
+                var $this = $(this);
+                var iSettings = self.getSettings($this.data('toptempid'));
+                var visible = true;
+                if (typeof iSettings == "undefined" || iSettings.show() == false){
+                    visible = false;
+                }else if ($this.hasClass('TopTempWaitPrinter') && !printing){
+                    visible = false;
+                }else if ($this.hasClass('TopTempWaitIdle') && printing){
+                    visible = false;
+                }else if ($this.hasClass('TopTempHideNoPrinter') && !self.tempModel.isOperational()){
+                    visible = false;
+                }
+                $this.toggle(visible);
+                $this.next('span.divider-vertical').toggle(visible);
             });
         }
 
@@ -1133,13 +1167,7 @@ $(function() {
                 $('#navbar_plugin_toptemp div.TopTempPrinter + span.divider-vertical').hide();
             }
 
-            if (self.connection.isPrinting()){
-                $('#navbar_plugin_toptemp div.TopTempWaitPrinter').show();
-                $('#navbar_plugin_toptemp div.TopTempWaitPrinter + span.divider-vertical').show();
-            }else{
-                $('#navbar_plugin_toptemp div.TopTempWaitPrinter').hide();
-                $('#navbar_plugin_toptemp div.TopTempWaitPrinter + span.divider-vertical').hide();
-            }
+            self.updatePrintStateVis();
 
 
             // Make popovers with more information
@@ -1523,6 +1551,12 @@ $(function() {
                 if (localSettings.waitForPrint()){
                     className += " TopTempWaitPrinter";
                     if (!self.connection.isPrinting()){
+                        preHide = true;
+                    }
+                }
+                if (localSettings.waitForIdle()){
+                    className += " TopTempWaitIdle";
+                    if (self.connection.isPrinting()){
                         preHide = true;
                     }
                 }
