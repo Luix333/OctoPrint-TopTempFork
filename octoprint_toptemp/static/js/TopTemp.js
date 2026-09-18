@@ -26,6 +26,10 @@ $(function() {
         self.customHistory = {};
         self.jsLoaded = false;
         self.firstBound = true;
+        self.printerItemSig = null;
+        self.chartistRequested = false;
+        self.axisTitleRequested = false;
+        self.sortableRequested = false;
 
         self.popoverOpen = false;
 
@@ -1015,9 +1019,41 @@ $(function() {
         }
 
         // UI ready
+        // Chartist and its axis title plugin are fetched on demand rather than being
+        // declared as plugin assets. Both are UMD bundles, so if anything else on the
+        // page has left an AMD define() in scope they register as AMD modules instead
+        // of attaching to the global: chartist-plugin-axistitle asks for a "chartist"
+        // module that nothing provides, so Chartist.plugins.ctAxisTitle never appears.
+        // That used to re-enter onAllBound forever, appending the script again on every
+        // pass and never reaching buildContainers, leaving the navbar stuck on its
+        // "Waiting..." placeholder until the settings dialog rebuilt it. Keep define()
+        // out of the way while the script runs so it takes the browser global branch.
+        self.loadDependency = function(src){
+            var amdDefine = window.define;
+            var hidAmd = typeof amdDefine == "function" && amdDefine.amd;
+            if (hidAmd){
+                window.define = undefined;
+            }
+            var resume = function(){
+                if (hidAmd){
+                    window.define = amdDefine;
+                }
+                self.jsLoaded = true;
+                self.onAllBound();
+            };
+            var script = document.createElement('script');
+            script.onload = resume;
+            // Carry on even if it never arrives
+            script.onerror = resume;
+            script.src = src;
+            document.body.appendChild(script);
+        }
+
         self.onAllBound = function(){
-            // We dont wait for this :)
-            if (typeof Sortable != "function"){
+            // We dont wait for this :) - but onAllBound re-enters itself while the
+            // chartist dependencies load, so only ask for it once
+            if (typeof Sortable != "function" && !self.sortableRequested){
+                self.sortableRequested = true;
                 var script = document.createElement('script');
                 script.src = '/plugin/toptemp/static/js/Sortable.min.js';
                 document.body.appendChild(script);
@@ -1034,41 +1070,26 @@ $(function() {
                 });
             }
 
-            // Include chartist if not included already
-            if (typeof Chartist != "object"){
+            // Include chartist if not included already - once only, see loadDependency
+            if (typeof Chartist != "object" && !self.chartistRequested){
+                self.chartistRequested = true;
                 $('head').append('<link rel="stylesheet" href="./plugin/toptemp/static/css/chartist.min.css">');
                 self.jsLoaded = false;
-                var script = document.createElement('script');
-                script.onload = function () {
-                    // Retry
-                    self.jsLoaded = true;
-                    self.onAllBound();
-                };
-                script.src = './plugin/toptemp/static/js/chartist.min.js';
-                document.body.appendChild(script);
+                self.loadDependency('./plugin/toptemp/static/js/chartist.min.js');
                 return;
             }
 
-            // Check for plugin
-            if('plugins' in Chartist && 'ctAxisTitle' in Chartist.plugins){
-                self.jsLoaded = true;
-            }else{
-                // Load the js
-                var script = document.createElement('script');
-                script.onload = function () {
-                    // Retry
-                    self.jsLoaded = true;
-                    self.onAllBound();
-                };
-                script.src = './plugin/toptemp/static/js/chartist-plugin-axistitle.min.js';
-                document.body.appendChild(script);
+            // Check for plugin - once only
+            if (typeof Chartist == "object" && !('plugins' in Chartist && 'ctAxisTitle' in Chartist.plugins) && !self.axisTitleRequested){
+                self.axisTitleRequested = true;
+                self.loadDependency('./plugin/toptemp/static/js/chartist-plugin-axistitle.min.js');
                 return;
             }
 
-            // Wait for js
-            if (!self.jsLoaded){
-                return;
-            }
+            // Both have had their chance. Anything still missing only costs us graphs,
+            // and the drawing code already checks for it, so get the navbar built
+            // either way rather than leaving the placeholder up.
+            self.jsLoaded = true;
 
             // Update printer operational
             self.tempModel.isOperational.subscribe(function(state){
@@ -1085,6 +1106,11 @@ $(function() {
             self.connection.isPrinting.subscribe(function(state){
                 self.updatePrintStateVis();
             });
+
+            // Rebuild when the printer reports a different set of tools/bed/chamber
+            self.tempModel.tools.subscribe(self.rebuildIfPrinterItemsChanged);
+            self.tempModel.hasBed.subscribe(self.rebuildIfPrinterItemsChanged);
+            self.tempModel.hasChamber.subscribe(self.rebuildIfPrinterItemsChanged);
 
 
             // Get cpu options
@@ -1109,6 +1135,24 @@ $(function() {
                     $('#navbar_plugin_toptemp >div').popover('hide');
                 }
             });
+        }
+
+        // The tool count, bed and chamber are not known until the server pushes the
+        // first printer state, which can land after onAllBound has already built the
+        // navbar. Containers for items that look absent are skipped at build time and
+        // nothing recreates them -- fromCurrentData only formats containers that
+        // already exist -- so they stay missing until something else rebuilds. Record
+        // what each build assumed and rebuild when the printer says otherwise.
+        self.printerItemSignature = function(){
+            return self.tempModel.tools().length + '|' + self.tempModel.hasBed() + '|' + self.tempModel.hasChamber();
+        }
+
+        self.rebuildIfPrinterItemsChanged = function(){
+            // Nothing built yet, so let onAllBound do the first build
+            if (self.printerItemSig === null || self.printerItemSig === self.printerItemSignature()){
+                return;
+            }
+            self.buildContainers();
         }
 
         // Show/hide the items that only appear while printing or while idle.
@@ -1137,6 +1181,7 @@ $(function() {
         // Build containers
         self.buildContainers = function(){
             $('#navbar_plugin_toptemp').html('');
+            self.printerItemSig = self.printerItemSignature();
             var allItems = self.buildIconOrder();
             // Build containers
             $.each(allItems, function(id,name){
