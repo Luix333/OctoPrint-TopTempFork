@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Top-Temp"
-version = "0.0.2.5"
+version = "0.0.2.6"
 description = "Show temperatures and more in the top bar"
 authors = [
     { name = "Mikkel Skovgaard", email = "toptemp@jemi.dk" },
@@ -23,7 +23,7 @@ dynamic = [
 toptemp = "octoprint_toptemp"
 
 [project.urls]
-Homepage = "https://github.com/LazeMSS/OctoPrint-TopTemp"
+Homepage = "https://github.com/Luix333/OctoPrint-TopTempFork"
 
 [project.optional-dependencies]
 develop = [

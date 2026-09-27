@@ -926,12 +926,12 @@ class TopTempPlugin(octoprint.plugin.StartupPlugin,
 
                 # version check: github repository
                 type="github_release",
-                user="LazeMSS",
-                repo="OctoPrint-TopTemp",
+                user="Luix333",
+                repo="OctoPrint-TopTempFork",
                 current=self._plugin_version,
 
                 # update method: pip
-                pip="https://github.com/LazeMSS/OctoPrint-TopTemp/archive/{target_version}.zip"
+                pip="https://github.com/Luix333/OctoPrint-TopTempFork/archive/{target_version}.zip"
             )
         )
 
